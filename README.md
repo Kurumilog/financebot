@@ -1,51 +1,61 @@
-# Finance Bot
+# FinanceBot  
 
-Finance Bot is a Telegram bot designed to help users manage their finances by tracking transactions, budgets, and balances.
+FinanceBot is a pocket-user Telegram bot designed to help users track their finances effectively. It allows users to manage their budgets, record transactions, and generate reports with ease.  
 
-## Features
+## Technologies Used  
 
-- User registration and authentication
-- Transaction tracking (income and expenses)
-- Budget management
-- Balance updates
-- User information retrieval
+- **Programming Language**: Python  
+- **Telegram Bot Framework**: [aiogram](https://docs.aiogram.dev/)  
+- **Database**: SQLite 3, Redis(FSMcontext)
 
-## Prerequisites
+## Setup  
 
-- Docker
-- Docker Compose (optional, for multi-container setups)
-- Telegram Bot Token (obtain from [BotFather](https://core.telegram.org/bots#botfather))
+1. Clone the repository:  
+   ```bash
+   git clone https://github.com/Kurumilog/financebot.git
+   cd financebot
+   ```  
 
-## Setup
+2. Install required dependencies:  
+   ```bash
+   pip install -r requirements.txt
+   ```  
 
-1. **Clone the repository:**
-bash
-git clone https://github.com/Kurumilog/financebot.git
-cd financebot
-2. **Create a `.env` file:**
+3. Configure your environment:  
+   - Add your Telegram Bot API TOKEN(use this name for variable) to a `.env` file or directly into `bot.py`.  
 
- Create a `.env` file in the root directory and add your Telegram bot token:
- env
-TOKEN=your_telegram_bot_token
-3. **Build and run the Docker container:**
-bash
-docker build -t financebot .
-docker run --env-file .env -p 8000:8000 financebot
-Alternatively, if using Docker Compose:
-bash
-docker-compose up --build
-4. **Interact with the bot:**
+4. Run the bot:  
+   ```bash
+   python bot.py
+   ```  
 
- Open Telegram and start a chat with your bot using the token provided.
+## Commands  
 
-## Database
+| Command            | Description                        |     |
+| ------------------ | ---------------------------------- | --- |
+| `/start`           | Start the bot.                     |     |
+| `/register`        | create profile                     |     |
+| `/add_transaction` | guess what it is                   |     |
+| `/report`          | view incomes and expenses          |     |
+| `/maxreport`       | view incomes and expenses + graphs |     |
+| `/user_info`       | all info about you in db           |     |
 
-The bot uses SQLite for data storage. The database file `finance_bot.db` is created automatically in the project directory.
+## Future Features  
 
-## Contributing
+- Integration with external APIs for currency conversion.  
+- Advanced analytics for financial insights.  
+- websocket to track your crypto wallets
 
-Contributions are welcome! Please fork the repository and submit a pull request.
+## Contributing  
 
-## License
+Contributions are welcome! Feel free to submit issues and pull requests.  
 
-This project is licensed under the MIT License.
+## License  
+
+This project is licensed under the MIT License.  
+
+---  
+
+### Author  
+
+Created and maintained by [Kurumilog](https://github.com/Kurumilog).  
