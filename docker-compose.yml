@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+bot:
+  build: .
+  container_name: financebot
+  environment:
+    - TOKEN=${TOKEN}
+  volumes:
+    - .:/app
+  ports:
+    - "8000:8000"
+  command: python bot.py
