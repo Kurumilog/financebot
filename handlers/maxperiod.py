@@ -1,8 +1,9 @@
-from aiogram import types, Router
-from aiogram.filters import Command
+from aiogram import types, Router, F
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, InputFile
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.types import BufferedInputFile
 import asyncio
 import matplotlib
 matplotlib.use('Agg')
@@ -14,13 +15,11 @@ from datetime import datetime
 import sqlite3
 import logging
 
-
 logging.basicConfig(level=logging.DEBUG)
 
 DATABASE_PATH = 'finance_bot.db'
 
 maxperiod_router = Router()
-
 
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_PATH)
@@ -42,7 +41,6 @@ def normalize_date_input(date_str):
     month = month.zfill(2)
     normalized_date_str = f"{day}-{month}-{year}"
     return normalized_date_str
-    print(normalized_date_str)
 
 def generate_plots(df):
     images = []
@@ -84,40 +82,53 @@ def generate_plots(df):
 
     return images
 
-@maxperiod_router.message(Command('maxperiod'))
+cancel_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text='Cancel')]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+
+@maxperiod_router.message(Command('maxreport'))
 async def maxperiod_start(message: Message, state: FSMContext):
-    await message.answer("📅 Please enter the **start date** for the analytics (format: DD-MM-YYYY):")
+    await message.answer("📅 Please enter the **start date** for the analytics (format: DD-MM-YYYY):", reply_markup=cancel_keyboard)
     await state.set_state(MaxPeriodForm.start_date)
 
 @maxperiod_router.message(MaxPeriodForm.start_date)
 async def process_maxperiod_start_date(message: Message, state: FSMContext):
+    if message.text.strip().lower() == 'cancel':
+        await cancel_handler(message, state)
+        return
     start_date_str = message.text.strip()
     logging.debug(f"Original start date input: {start_date_str}")
     normalized_date_str = normalize_date_input(start_date_str)
     logging.debug(f"Normalized start date input: {normalized_date_str}")
     if not normalized_date_str:
-        await message.answer("❗ Invalid date format. Please enter the date in DD-MM-YYYY format (e.g., 01-12-2024).")
+        await message.answer("❗ Invalid date format. Please enter the date in DD-MM-YYYY format (e.g., 01-12-2024).", reply_markup=cancel_keyboard)
         return
 
     try:
         start_date = datetime.strptime(normalized_date_str, "%d-%m-%Y")
     except ValueError:
-        await message.answer("❗ Invalid date. Please ensure the date exists and is in DD-MM-YYYY format (e.g., 01-12-2024).")
+        await message.answer("❗ Invalid date. Please ensure the date exists and is in DD-MM-YYYY format (e.g., 01-12-2024).", reply_markup=cancel_keyboard)
         return
 
     await state.update_data(start_date=start_date)
-    await message.answer("📅 Please enter the **end date** for the analytics (format: DD-MM-YYYY):")
+    await message.answer("📅 Please enter the **end date** for the analytics (format: DD-MM-YYYY):", reply_markup=cancel_keyboard)
     await state.set_state(MaxPeriodForm.end_date)
-
 
 @maxperiod_router.message(MaxPeriodForm.end_date)
 async def process_maxperiod_end_date(message: Message, state: FSMContext):
+    if message.text.strip().lower() == 'cancel':
+        await cancel_handler(message, state)
+        return
     end_date_str = message.text.strip()
     logging.debug(f"Original end date input: {end_date_str}")
     normalized_date_str = normalize_date_input(end_date_str)
     logging.debug(f"Normalized end date input: {normalized_date_str}")
     if not normalized_date_str:
-        await message.answer("❗ Invalid date format. Please enter the date in DD-MM-YYYY format (e.g., 01-12-2024).")
+        await message.answer("❗ Invalid date format. Please enter the date in DD-MM-YYYY format (e.g., 01-12-2024).", reply_markup=cancel_keyboard)
         return
 
     data = await state.get_data()
@@ -126,15 +137,15 @@ async def process_maxperiod_end_date(message: Message, state: FSMContext):
     try:
         end_date = datetime.strptime(normalized_date_str, "%d-%m-%Y")
     except ValueError:
-        await message.answer("❗ Invalid date. Please ensure the date exists and is in DD-MM-YYYY format (e.g., 01-12-2024).")
+        await message.answer("❗ Invalid date. Please ensure the date exists and is in DD-MM-YYYY format (e.g., 01-12-2024).", reply_markup=cancel_keyboard)
         return
 
     if end_date < start_date:
-        await message.answer("❗ End date cannot be earlier than the start date. Please enter a valid end date.")
+        await message.answer("❗ End date cannot be earlier than the start date. Please enter a valid end date.", reply_markup=cancel_keyboard)
         return
 
+    await message.answer("Generating your report...", reply_markup=ReplyKeyboardRemove())
     await generate_and_send_plots(message, state, start_date, end_date)
-
 
 async def generate_and_send_plots(message: Message, state: FSMContext, start_date: datetime, end_date: datetime):
     try:
@@ -165,12 +176,14 @@ async def generate_and_send_plots(message: Message, state: FSMContext, start_dat
 
         loop = asyncio.get_running_loop()
         images = await loop.run_in_executor(None, partial(generate_plots, df))
+
         logging.debug(f"Generated images: {images}")
 
         for title, image_io in images:
             logging.debug(f"Sending image: {title}")
             image_io.seek(0)
-            photo = InputFile(image_io, filename='plot.png')
+            photo_bytes = image_io.getvalue()
+            photo = BufferedInputFile(photo_bytes, filename='plot.png')
             await message.answer_photo(photo=photo, caption=title)
 
     except Exception as e:
@@ -178,3 +191,8 @@ async def generate_and_send_plots(message: Message, state: FSMContext, start_dat
         await message.answer("An error occurred while generating the report. Please try again later.")
     finally:
         await state.clear()
+
+@maxperiod_router.message(F.text.casefold() == 'cancel', StateFilter('*'))
+async def cancel_handler(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("❌ Operation cancelled.", reply_markup=ReplyKeyboardRemove())
