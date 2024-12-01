@@ -38,7 +38,7 @@ END;
 ''')
 
 # Create Report table
-c.execute('''CREATE TABLE IF NOT EXISTS report (
+""" c.execute('''CREATE TABLE IF NOT EXISTS report (
     report_id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     total_income REAL NOT NULL DEFAULT 0.0,
@@ -47,7 +47,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS report (
     start_period DATE NOT NULL,
     end_period DATE NOT NULL,
     FOREIGN KEY (user_id) REFERENCES user (user_id) ON DELETE CASCADE
-);''')
+);''') """
 
 
 
