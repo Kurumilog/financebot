@@ -35,7 +35,7 @@ cancel_keyboard = ReplyKeyboardMarkup(
 async def register_command(message: Message, state: FSMContext) -> None:
     await state.set_state(UserRegister.first_name)
     await message.reply(
-        "Welcome to the Finance Bot! Let's register you. Please enter your name:",
+        "Welcome to the Finance Bot! Let's register you. Please enter your name",
         reply_markup=cancel_keyboard
     )
 

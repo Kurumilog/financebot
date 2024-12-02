@@ -5,45 +5,26 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import User, Message
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+
+
 import sqlite3
-import re
-from keyboards.inline_keyboards import categories_keyboard, transaction_type_keyboard
+
+#importing keyboards from keyboards/reply_keyboards.py
+from keyboards.reply_keyboards import categories_keyboard, transaction_type_keyboard
+from keyboards.reply_keyboards import cancel_keyboard
+
+#importing func from database/db.py 
 from database.db import add_user
+from database.db import get_db_connection
+
+#you can read the descriptin of this func in utils/helpers.py
+from utils.helpers import remove_emojis
 
 DATABASE_PATH = 'finance_bot.db'
 
+#i use this router to manage simple user messages
 user_private_router = Router()
 
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def add_transaction(user_id, amount, description, category, transaction_type):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute('''
-        INSERT INTO UserTransaction (user_id, amount, description, category, transaction_type, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (user_id, amount, description, category, transaction_type, datetime.now()))
-    conn.commit()
-    conn.close()
-
-def get_user_transactions(user_id):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute('SELECT * FROM UserTransaction WHERE user_id = ?', (user_id,))
-    transactions = c.fetchall()
-    conn.close()
-    return transactions
-
-cancel_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text='Cancel')]
-    ],
-    resize_keyboard=True,
-    one_time_keyboard=True
-)
 
 @user_private_router.message(CommandStart())
 async def command_start(message: Message):
@@ -53,118 +34,6 @@ async def command_start(message: Message):
 async def list_commands(message: Message):
     await message.answer("Here's the list: \n /commands - list of commands, \n /user_info - all info about you in db, \n /add_transaction - guess what it is, \n /report - view all incomes and expenses in custom period, \n /maxreport - like report but more detailed")
 
-class TransactionForm(StatesGroup):
-    amount = State()
-    category = State()
-    custom_category = State()
-    transaction_type = State()
-
-def remove_emojis(text):
-    emoji_pattern = re.compile(
-        pattern="[" +
-        u"\U0001F600-\U0001F64F" +
-        u"\U0001F300-\U0001F5FF" +
-        u"\U0001F680-\U0001F6FF" +
-        u"\U0001F1E0-\U0001F1FF" +
-        u"\U00002600-\U000026FF" +
-        u"\U00002700-\U000027BF" +
-        "]+",
-        flags=re.UNICODE)
-    return emoji_pattern.sub(r'', text).strip()
-
-@user_private_router.message(Command('add_transaction'))
-async def add_transaction_start(message: types.Message, state: FSMContext):
-    await message.answer("Please enter the amount of the transaction:", reply_markup=cancel_keyboard)
-    await state.set_state(TransactionForm.amount)
-
-@user_private_router.message(TransactionForm.amount)
-async def process_amount(message: types.Message, state: FSMContext):
-    if message.text.strip().lower() == 'cancel':
-        await cancel_handler(message, state)
-        return
-    text_input = message.text.strip()
-    try:
-        amount = int(text_input)
-    except ValueError:
-        try:
-            amount = float(text_input)
-        except ValueError:
-            await message.answer("❗ Please enter a valid amount using numbers only (e.g., 100 or 100.50).", reply_markup=cancel_keyboard)
-            return
-
-    await state.update_data(amount=amount)
-    await message.answer(
-        "Please select the category of the transaction:",
-        reply_markup=categories_keyboard()
-    )
-    await state.set_state(TransactionForm.category)
-
-@user_private_router.message(TransactionForm.category)
-async def process_category(message: types.Message, state: FSMContext):
-    if message.text.strip().lower() == 'cancel':
-        await cancel_handler(message, state)
-        return
-    category = message.text.strip()
-    allowed_categories = ['🍔 Food', '🚌 Transport', '🛍️ Shopping', '💡 Utilities', '💼 Salary', '📈 Investment', 'Other']
-
-    if category not in allowed_categories:
-        await message.answer("❗ Please select a category from the keyboard.", reply_markup=cancel_keyboard)
-        return
-
-    if category == 'Other':
-        await message.answer("Please enter the category:", reply_markup=cancel_keyboard)
-        await state.set_state(TransactionForm.custom_category)
-    else:
-        plain_category = remove_emojis(category)
-        await state.update_data(category=plain_category)
-        await message.answer(
-            "Please select the type of transaction:",
-            reply_markup=transaction_type_keyboard()
-        )
-        await state.set_state(TransactionForm.transaction_type)
-
-@user_private_router.message(TransactionForm.custom_category)
-async def process_custom_category(message: types.Message, state: FSMContext):
-    if message.text.strip().lower() == 'cancel':
-        await cancel_handler(message, state)
-        return
-    category = message.text.strip()
-    await state.update_data(category=category)
-    await message.answer(
-        "Please select the type of transaction:",
-        reply_markup=transaction_type_keyboard()
-    )
-    await state.set_state(TransactionForm.transaction_type)
-
-@user_private_router.message(TransactionForm.transaction_type)
-async def process_transaction_type(message: types.Message, state: FSMContext):
-    if message.text.strip().lower() == 'cancel':
-        await cancel_handler(message, state)
-        return
-    transaction_input = message.text.strip()
-    if transaction_input in ['💰 Income', 'Income', '💸 Expense', 'Expense']:
-        if 'Income' in transaction_input:
-            transaction_type = 'income'
-        else:
-            transaction_type = 'expense'
-        await state.update_data(transaction_type=transaction_type)
-        data = await state.get_data()
-        user_id = message.from_user.id
-        amount = data['amount']
-        category = data['category']
-        created_at = datetime.now().strftime('%Y-%m-%d')
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO UserTransaction (user_id, amount, category, transaction_type, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (user_id, amount, category, transaction_type, created_at))
-        conn.commit()
-        conn.close()
-        await message.answer("✅ Transaction successfully added!", reply_markup=ReplyKeyboardRemove())
-        await state.clear()
-    else:
-        await message.answer("❗ Please select a valid transaction type from the keyboard.", reply_markup=cancel_keyboard)
 
 @user_private_router.message(Command('user_info'))
 async def get_user_info(message: Message):
@@ -271,9 +140,9 @@ async def process_end_date(message: Message, state: FSMContext):
 
         report_message = (
             f"📊 **Report from {start_date_str_formatted} to {end_date_str_formatted}**\n\n"
-            f"💰 Total Income: {total_income:.2f}\n"
-            f"💸 Total Expenses: {total_expense:.2f}\n"
-            f"📈 New Balance: {balance:.2f}"
+            f"💰 Total Income: {total_income:.2f} $\n"
+            f"💸 Total Expenses: {total_expense:.2f} $\n"
+            f"📈 New Balance: {balance:.2f} $"
         )
 
         await message.answer(report_message, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())

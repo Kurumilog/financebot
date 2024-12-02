@@ -9,13 +9,22 @@ def transaction_type_keyboard():
   builder = ReplyKeyboardBuilder()
   builder.button(text='💰 Income')
   builder.button(text='💸 Expense')
+  builder.button(text='Cancel')
   builder.adjust(2)
   return builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
 def categories_keyboard():
   builder = ReplyKeyboardBuilder()
-  categories = ['🍔 Food', '🚌 Transport', '🛍️ Shopping', '💡 Utilities', '💼 Salary', '📈 Investment', 'Other']
+  categories = ['🍔 Food', '🚌 Transport', '🛍️ Shopping', '💡 Utilities', '💼 Salary', '📈 Investment', 'Other', 'Cancel']
   for category in categories:
       builder.button(text=category)
   builder.adjust(2)
   return builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
+
+cancel_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text='Cancel')]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)

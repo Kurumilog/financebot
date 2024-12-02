@@ -6,7 +6,8 @@ from aiogram import Bot, Dispatcher
 
 from handlers.user_commands import user_private_router
 from handlers.user_register import user_register_router
-from handlers.maxperiod import maxperiod_router
+from handlers.report import report_router
+from handlers.transaction import transaction_router
 
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
@@ -15,7 +16,8 @@ bot = Bot(token=os.getenv("TOKEN"))
 dp = Dispatcher()
 dp.include_router(user_private_router)
 dp.include_router(user_register_router)
-dp.include_router(maxperiod_router)
+dp.include_router(report_router)
+dp.include_router(transaction_router)
 
 
 async def main():

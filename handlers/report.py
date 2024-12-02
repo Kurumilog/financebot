@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 DATABASE_PATH = 'finance_bot.db'
 
-maxperiod_router = Router()
+report_router = Router()
 
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_PATH)
@@ -90,12 +90,12 @@ cancel_keyboard = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
-@maxperiod_router.message(Command('maxreport'))
+@report_router.message(Command('maxreport'))
 async def maxperiod_start(message: Message, state: FSMContext):
     await message.answer("📅 Please enter the **start date** for the analytics (format: DD-MM-YYYY):", reply_markup=cancel_keyboard)
     await state.set_state(MaxPeriodForm.start_date)
 
-@maxperiod_router.message(MaxPeriodForm.start_date)
+@report_router.message(MaxPeriodForm.start_date)
 async def process_maxperiod_start_date(message: Message, state: FSMContext):
     if message.text.strip().lower() == 'cancel':
         await cancel_handler(message, state)
@@ -118,7 +118,7 @@ async def process_maxperiod_start_date(message: Message, state: FSMContext):
     await message.answer("📅 Please enter the **end date** for the analytics (format: DD-MM-YYYY):", reply_markup=cancel_keyboard)
     await state.set_state(MaxPeriodForm.end_date)
 
-@maxperiod_router.message(MaxPeriodForm.end_date)
+@report_router.message(MaxPeriodForm.end_date)
 async def process_maxperiod_end_date(message: Message, state: FSMContext):
     if message.text.strip().lower() == 'cancel':
         await cancel_handler(message, state)
@@ -192,7 +192,99 @@ async def generate_and_send_plots(message: Message, state: FSMContext, start_dat
     finally:
         await state.clear()
 
-@maxperiod_router.message(F.text.casefold() == 'cancel', StateFilter('*'))
+@report_router.message(F.text.casefold() == 'cancel', StateFilter('*'))
+async def cancel_handler(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("❌ Operation cancelled.", reply_markup=ReplyKeyboardRemove())
+    
+    
+    
+class ReportForm(StatesGroup):
+    start_date = State()
+    end_date = State()
+        
+@report_router.message(Command('report'))
+async def report_start(message: Message, state: FSMContext):
+    await message.answer("📅 Please enter the **start date** for the report (format: DD-MM-YYYY):", reply_markup=cancel_keyboard)
+    await state.set_state(ReportForm.start_date)
+
+@report_router.message(ReportForm.start_date)
+async def process_start_date(message: Message, state: FSMContext):
+    if message.text.strip().lower() == 'cancel':
+        await cancel_handler(message, state)
+        return
+    start_date_str = message.text.strip()
+    try:
+        start_date = datetime.strptime(start_date_str, "%d-%m-%Y")
+        await state.update_data(start_date=start_date)
+        await message.answer("📅 Please enter the **end date** for the report (format: DD-MM-YYYY):", reply_markup=cancel_keyboard)
+        await state.set_state(ReportForm.end_date)
+    except ValueError:
+        await message.answer("❗ Invalid date format. Please enter the date in DD-MM-YYYY format.", reply_markup=cancel_keyboard)
+    return
+
+@report_router.message(ReportForm.end_date)
+async def process_end_date(message: Message, state: FSMContext):
+    if message.text.strip().lower() == 'cancel':
+        await cancel_handler(message, state)
+        return
+    end_date_str = message.text.strip()
+    data = await state.get_data()
+    start_date = data.get('start_date')
+
+    try:
+        end_date = datetime.strptime(end_date_str, "%d-%m-%Y")
+        if end_date < start_date:
+            await message.answer("❗ End date cannot be earlier than start date. Please enter a valid end date.", reply_markup=cancel_keyboard)
+            return
+
+        start_date_db = start_date.strftime('%Y-%m-%d')
+        end_date_db = end_date.strftime('%Y-%m-%d')
+
+        user_id = message.from_user.id
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('''
+    SELECT transaction_type, SUM(amount) as total_amount
+    FROM UserTransaction
+    WHERE user_id = ? AND
+        DATE(created_at) BETWEEN DATE(?) AND DATE(?)
+    GROUP BY transaction_type
+    ''', (user_id, start_date_db, end_date_db))
+
+        results = cursor.fetchall()
+
+        total_income = 0.0
+        total_expense = 0.0
+
+        for row in results:
+            if row['transaction_type'] == 'income':
+                total_income = row['total_amount'] if row['total_amount'] else 0.0
+            elif row['transaction_type'] == 'expense':
+                total_expense = row['total_amount'] if row['total_amount'] else 0.0
+
+        balance = total_income - total_expense
+
+        start_date_str_formatted = start_date.strftime('%d-%m-%Y')
+        end_date_str_formatted = end_date.strftime('%d-%m-%Y')
+
+        report_message = (
+            f"📊 **Report from {start_date_str_formatted} to {end_date_str_formatted}**\n\n"
+            f"💰 Total Income: {total_income:.2f}\n"
+            f"💸 Total Expenses: {total_expense:.2f}\n"
+            f"📈 New Balance: {balance:.2f}"
+        )
+
+        await message.answer(report_message, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
+        await state.clear()
+        conn.close()
+    except ValueError:
+        await message.answer("❗ Invalid date format. Please enter the date in DD-MM-YYYY format.", reply_markup=cancel_keyboard)
+        return
+
+@report_router.message(F.text.casefold() == 'cancel', StateFilter('*'))
 async def cancel_handler(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("❌ Operation cancelled.", reply_markup=ReplyKeyboardRemove())
