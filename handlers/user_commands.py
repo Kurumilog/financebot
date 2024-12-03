@@ -32,7 +32,7 @@ async def command_start(message: Message):
 
 @user_private_router.message(Command('commands'))
 async def list_commands(message: Message):
-    await message.answer("Here's the list: \n /commands - list of commands, \n /user_info - all info about you in db, \n /add_transaction - guess what it is, \n /report - view all incomes and expenses in custom period, \n /maxreport - like report but more detailed")
+    await message.answer("Here's the list: \n /commands - list of commands, \n /user_info - all info about you in db, \n /add_transaction - guess what it is, \n /report - view all incomes and expenses in custom period, \n /maxreport - like report but more detailed, \n /transactions - view all transactions")
 
 
 @user_private_router.message(Command('user_info'))
