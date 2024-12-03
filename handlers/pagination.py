@@ -72,7 +72,7 @@ async def show_transactions(message: types.Message):
     transactions, total_pages = get_transactions_page(user_id, page)
 
     if not transactions:
-        await message.answer("У вас пока нет транзакций.")
+        await message.answer("You don't have transactions yet.")
         return
 
     text = "📊 Ваши транзакции:\n\n"
@@ -90,7 +90,7 @@ async def process_page_callback(callback_query: types.CallbackQuery):
 
     transactions, total_pages = get_transactions_page(user_id, page)
 
-    text = "📊 Ваши транзакции:\n\n"
+    text = "📊 Your transactions:\n\n"
     for trans in transactions:
         text += format_transaction(trans) + "\n"
 
