@@ -75,7 +75,7 @@ async def show_transactions(message: types.Message):
         await message.answer("You don't have transactions yet.")
         return
 
-    text = "📊 Ваши транзакции:\n\n"
+    text = "📊 Your transactions:\n\n"
     for trans in transactions:
         text += format_transaction(trans) + "\n"
 
